@@ -1,12 +1,5 @@
 {
-  "_lisezmoi": "Les lieux listés ici apparaissent sur tous les navigateurs et tous les appareils. Modifiez ce fichier depuis GitHub (crayon en haut à droite), validez, attendez une minute : le site se met à jour partout. Le bouton « Copier pour places.json » d'une fiche de prévision produit ce bloc tout prêt. Champs obligatoires : name, lat, lon. L'id doit rester stable dans le temps.",
+  "_lisezmoi": "Les lieux listés ici s'affichent sur tous les navigateurs et tous les appareils. Pour en ajouter un : modifiez ce fichier depuis GitHub (icône crayon), validez, attendez une minute. Champs obligatoires : name, lat, lon. L'id doit rester stable dans le temps. Exemple d'entrée : { \"id\": \"maison\", \"name\": \"Maison\", \"address\": \"Montbrison, 42600\", \"lat\": 45.60833, \"lon\": 4.06639 }",
   "places": [
-    {
-      "id": "montbrison",
-      "name": "Montbrison",
-      "address": "Montbrison, 42600, Loire",
-      "lat": 45.60833,
-      "lon": 4.06639
-    }
   ]
 }

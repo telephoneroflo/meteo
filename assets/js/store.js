@@ -146,71 +146,10 @@
     }
   }
 
-  /* ---------- import / export ---------- */
-
-  /* base64 tolérant à l'UTF-8, variante compatible URL */
-  function encode(obj) {
-    var s = global.btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
-    return s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-  function decode(str) {
-    var s = str.replace(/-/g, '+').replace(/_/g, '/');
-    while (s.length % 4) s += '=';
-    return JSON.parse(decodeURIComponent(escape(global.atob(s))));
-  }
-
-  /* n'exporte que le strict nécessaire, pour un lien court */
-  function exportPayload() {
-    return all().map(function (p) {
-      return { i: p.id, n: p.name, a: p.address, y: +p.lat.toFixed(5), x: +p.lon.toFixed(5) };
-    });
-  }
-
-  function importPayload(str) {
-    var arr;
-    try { arr = decode(str); } catch (e) { return { added: 0, skipped: 0, error: true }; }
-    if (!Array.isArray(arr)) return { added: 0, skipped: 0, error: true };
-
-    var known = all(), added = 0, skipped = 0;
-    arr.forEach(function (o) {
-      var p = clean({ id: o.i, name: o.n, address: o.a, lat: o.y, lon: o.x });
-      if (!p) { skipped++; return; }
-      var dup = known.some(function (k) {
-        return k.id === p.id ||
-          (Math.abs(k.lat - p.lat) < 1e-4 && Math.abs(k.lon - p.lon) < 1e-4);
-      });
-      if (dup) { skipped++; return; }
-      /* un identifiant du socle masqué ici redevient visible */
-      var d = deleted.indexOf(p.id);
-      if (d !== -1) { deleted.splice(d, 1); writeJSON(DKEY, deleted); }
-      p.createdAt = Date.now();
-      local.push(p);
-      known.push(p);
-      added++;
-    });
-    if (added) writeJSON(LKEY, local);
-    return { added: added, skipped: skipped, error: false };
-  }
-
-  /* bloc prêt à coller dans places.json */
-  function toSharedJSON() {
-    return JSON.stringify({
-      places: all().map(function (p) {
-        return {
-          id: p.id, name: p.name, address: p.address,
-          lat: +p.lat.toFixed(5), lon: +p.lon.toFixed(5)
-        };
-      })
-    }, null, 2);
-  }
-
   global.Store = {
     ready: ready,
     all: all, get: get, add: add, update: update, remove: remove,
-    exportPayload: exportPayload, encode: encode, importPayload: importPayload,
-    toSharedJSON: toSharedJSON,
     persistent: canLS,
-    sharedLoaded: function () { return sharedOk; },
-    sharedCount: function () { return shared.length; }
+    sharedLoaded: function () { return sharedOk; }
   };
 })(window);

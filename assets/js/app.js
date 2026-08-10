@@ -15,34 +15,9 @@
     if (id !== 'view-fc') Views.stopClock();
   }
   function el(id) { return document.getElementById(id); }
-  function say(node, msg, kind) {
+  function say(node, msg, isErr) {
     node.textContent = msg || '';
-    node.classList.toggle('status--err', kind === true || kind === 'err');
-    node.classList.toggle('status--ok', kind === 'ok');
-  }
-
-  /* copie presse-papier, avec repli sur les navigateurs anciens */
-  function copy(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text);
-    }
-    return new Promise(function (res, rej) {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', '');
-      ta.style.cssText = 'position:fixed;top:-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      var ok = false;
-      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-      document.body.removeChild(ta);
-      ok ? res() : rej(new Error('copie refusée'));
-    });
-  }
-
-  function shareLink() {
-    var b = location.href.split('#')[0];
-    return b + '#/import/' + Store.encode(Store.exportPayload());
+    node.classList.toggle('status--err', !!isErr);
   }
 
   /* =========================================================
@@ -206,23 +181,6 @@
   function dispatch() {
     var h = location.hash || '#/';
 
-    if (h.indexOf('#/import/') === 0) {
-      var res = Store.importPayload(h.slice(9));
-      show('view-home');
-      Views.home();
-      if (res.error) {
-        say(el('home-status'), 'Lien de transfert illisible ou tronqué.', 'err');
-      } else {
-        say(el('home-status'),
-          res.added + ' lieu' + (res.added > 1 ? 'x importés' : ' importé') +
-          (res.skipped ? ', ' + res.skipped + ' déjà présent' + (res.skipped > 1 ? 's' : '') : '') + '.',
-          'ok');
-      }
-      history.replaceState(null, '', location.href.split('#')[0] + '#/');
-      el('app').focus({ preventScroll: true });
-      return;
-    }
-
     if (h.indexOf('#/lieu/') === 0) {
       openForecast(h.slice(7));
     } else if (h === '#/nouveau') {
@@ -232,10 +190,7 @@
     } else {
       show('view-home');
       Views.home();
-      say(el('home-status'), '');
-      el('topbar-meta').textContent = Store.sharedLoaded()
-        ? 'Modèle Météo-France · maille 1,5 km · socle : ' + Store.sharedCount() + ' lieu(x)'
-        : 'Modèle Météo-France · maille 1,5 km';
+      el('topbar-meta').textContent = 'Modèle Météo-France · maille 1,5 km';
     }
     el('app').focus({ preventScroll: true });
     window.scrollTo(0, 0);
@@ -276,41 +231,12 @@
       });
     });
 
-    el('btn-share').addEventListener('click', function () {
-      copy(shareLink()).then(function () {
-        say(el('home-status'), 'Lien copié. Ouvrez-le sur l’autre appareil pour y importer la liste.', 'ok');
-      }).catch(function () {
-        window.prompt('Copiez ce lien puis ouvrez-le sur l’autre appareil :', shareLink());
-      });
-    });
-
-    el('btn-json-all').addEventListener('click', function () {
-      var txt = Store.toSharedJSON();
-      copy(txt).then(function () {
-        say(el('home-status'), 'Bloc copié. Collez-le dans places.json à la racine du dépôt, puis validez.', 'ok');
-      }).catch(function () { window.prompt('Contenu de places.json :', txt); });
-    });
-
-    el('btn-json').addEventListener('click', function () {
-      if (!currentPlace) return;
-      var one = JSON.stringify({
-        id: currentPlace.id, name: currentPlace.name, address: currentPlace.address,
-        lat: +currentPlace.lat.toFixed(5), lon: +currentPlace.lon.toFixed(5)
-      }, null, 2);
-      copy(one).then(function () {
-        say(el('fc-status'), 'Bloc copié. Ajoutez-le au tableau « places » de places.json.', 'ok');
-      }).catch(function () { window.prompt('Bloc à ajouter dans places.json :', one); });
-    });
-
     el('btn-refresh').addEventListener('click', function () {
       if (currentPlace) openForecast(currentPlace.id);
     });
     el('btn-del').addEventListener('click', function () {
       if (!currentPlace) return;
-      var msg = currentPlace.origin === 'shared'
-        ? 'Masquer « ' + currentPlace.name + ' » sur cet appareil ?\n\nCe lieu vient de places.json : il restera visible sur vos autres navigateurs. Pour le retirer partout, supprimez-le du fichier dans le dépôt.'
-        : 'Supprimer « ' + currentPlace.name + ' » ?';
-      if (window.confirm(msg)) {
+      if (window.confirm('Supprimer « ' + currentPlace.name + ' » ?')) {
         Store.remove(currentPlace.id);
         currentPlace = null;
         location.hash = '#/';
