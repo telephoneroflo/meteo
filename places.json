@@ -1,0 +1,5 @@
+{
+  "_lisezmoi": "Les lieux listés ici s'affichent sur tous les navigateurs et tous les appareils. Pour en ajouter un : modifiez ce fichier depuis GitHub (icône crayon), validez, attendez une minute. Champs obligatoires : name, lat, lon. L'id doit rester stable dans le temps. Exemple d'entrée : { \"id\": \"maison\", \"name\": \"Maison\", \"address\": \"Montbrison, 42600\", \"lat\": 45.60833, \"lon\": 4.06639 }",
+  "places": [
+  ]
+}
