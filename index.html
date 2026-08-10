@@ -44,6 +44,13 @@
 
     <div class="places" id="places-grid"></div>
 
+    <div class="home-act" id="home-act" hidden>
+      <button class="btn btn--ghost" id="btn-share" type="button">Copier un lien de transfert</button>
+      <button class="btn btn--ghost" id="btn-json-all" type="button">Copier pour places.json</button>
+    </div>
+    <p class="status" id="home-status" role="status"></p>
+    <p class="hint hint--block" id="home-hint"></p>
+
     <div class="empty" id="places-empty" hidden>
       <p class="empty__title">Aucun lieu enregistré</p>
       <p class="empty__body">Ajoutez une adresse pour commencer. Elle reste sur cet appareil, rien n’est envoyé ailleurs.</p>
@@ -120,6 +127,7 @@
       </div>
       <div class="fc-head__act">
         <button class="btn btn--ghost" id="btn-refresh" type="button">Actualiser</button>
+        <button class="btn btn--ghost" id="btn-json" type="button">Copier pour places.json</button>
         <button class="btn btn--ghost btn--danger" id="btn-del" type="button">Supprimer</button>
       </div>
     </div>

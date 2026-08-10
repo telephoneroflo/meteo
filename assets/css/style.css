@@ -351,3 +351,15 @@ a{color:inherit}
 
 .wx-bolt{animation:wx-flash 3.4s steps(1,end) infinite}
 @keyframes wx-flash{0%,86%{opacity:1}88%{opacity:.25}90%{opacity:1}93%{opacity:.3}95%,100%{opacity:1}}
+
+/* ---------- partage des lieux ---------- */
+.home-act{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}
+.hint--block{margin-top:10px;max-width:66ch}
+.place__tag{
+  position:absolute;top:14px;right:14px;
+  font-family:"Martian Mono",monospace;font-weight:300;
+  font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 7px;border-radius:999px;border:1px solid var(--line);color:var(--fg-3);
+}
+.place__tag.is-shared{color:var(--t-mild);border-color:rgba(111,217,174,.32)}
+.status--ok{color:var(--t-mild)}

@@ -1,41 +1,115 @@
 /* =========================================================
    store.js — persistance des lieux
-   localStorage quand il est disponible, repli en mémoire sinon
-   (mode privé strict, iframe sandboxée, file:// verrouillé…).
+   ---------------------------------------------------------
+   Deux niveaux qui se superposent :
+
+   1. SOCLE PARTAGÉ — places.json, versionné dans le dépôt.
+      Lu au démarrage, il apparaît sur tous les navigateurs
+      et tous les appareils. C'est la place des lieux durables.
+
+   2. AJOUTS LOCAUX — localStorage du navigateur courant.
+      Tout lieu créé depuis l'interface atterrit ici, car un
+      site statique ne peut rien écrire sur le serveur.
+
+   Un lieu du socle supprimé à la main ne réapparaît pas :
+   son identifiant est mémorisé dans une liste de suppressions
+   propre à l'appareil. Un lieu local portant le même
+   identifiant qu'un lieu du socle le remplace.
    ========================================================= */
 (function (global) {
   'use strict';
 
-  var KEY = 'arome.places.v1';
-  var mem = null;              // repli mémoire
+  var LKEY = 'arome.places.v1';
+  var DKEY = 'arome.deleted.v1';
+  var SHARED_URL = 'places.json';
+
+  var shared = [];      // socle du dépôt
+  var local = [];       // ajouts de cet appareil
+  var deleted = [];     // identifiants du socle masqués ici
+  var readyP = null;
+  var sharedOk = false;
+
+  /* ---------- accès bas niveau ---------- */
   var canLS = (function () {
     try {
-      var t = '__arome_test__';
-      global.localStorage.setItem(t, '1');
-      global.localStorage.removeItem(t);
+      global.localStorage.setItem('__arome__', '1');
+      global.localStorage.removeItem('__arome__');
       return true;
     } catch (e) { return false; }
   })();
 
-  function readRaw() {
-    if (canLS) { try { return global.localStorage.getItem(KEY); } catch (e) { return null; } }
-    return mem;
+  var mem = {};
+  function readJSON(k) {
+    var raw;
+    if (canLS) { try { raw = global.localStorage.getItem(k); } catch (e) { raw = null; } }
+    else raw = mem[k];
+    if (!raw) return null;
+    try { var v = JSON.parse(raw); return Array.isArray(v) ? v : null; } catch (e) { return null; }
   }
-  function writeRaw(str) {
-    if (canLS) { try { global.localStorage.setItem(KEY, str); return; } catch (e) { /* quota */ } }
-    mem = str;
+  function writeJSON(k, v) {
+    var raw = JSON.stringify(v);
+    if (canLS) { try { global.localStorage.setItem(k, raw); return; } catch (e) { /* quota */ } }
+    mem[k] = raw;
   }
 
+  /* ---------- normalisation d'une entrée ---------- */
+  function slug(s) {
+    return String(s || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'lieu';
+  }
+  function clean(p, fallbackId) {
+    if (!p) return null;
+    var lat = parseFloat(p.lat), lon = parseFloat(p.lon);
+    if (isNaN(lat) || isNaN(lon)) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    return {
+      id: String(p.id || fallbackId || slug(p.name)),
+      name: String(p.name || 'Sans nom').slice(0, 60),
+      address: String(p.address || '').slice(0, 160),
+      sub: String(p.sub || '').slice(0, 160),
+      lat: lat,
+      lon: lon
+    };
+  }
+
+  /* ---------- chargement du socle ---------- */
+  function ready() {
+    if (readyP) return readyP;
+    local = readJSON(LKEY) || [];
+    deleted = readJSON(DKEY) || [];
+
+    readyP = fetch(SHARED_URL, { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var list = !j ? [] : (Array.isArray(j) ? j : (j.places || []));
+        shared = list.map(function (p, i) { return clean(p, 'shared-' + i); })
+                     .filter(Boolean);
+        sharedOk = true;
+      })
+      .catch(function () { shared = []; sharedOk = false; })
+      .then(function () { return true; });
+
+    return readyP;
+  }
+
+  /* ---------- lecture ---------- */
   function all() {
-    var raw = readRaw();
-    if (!raw) return [];
-    try {
-      var v = JSON.parse(raw);
-      return Array.isArray(v) ? v : [];
-    } catch (e) { return []; }
+    var out = [];
+    shared.forEach(function (p) {
+      if (deleted.indexOf(p.id) !== -1) return;
+      if (local.some(function (l) { return l.id === p.id; })) return;
+      var c = Object.assign({}, p);
+      c.origin = 'shared';
+      out.push(c);
+    });
+    local.forEach(function (p) {
+      var c = Object.assign({}, p);
+      c.origin = 'local';
+      out.push(c);
+    });
+    return out;
   }
-
-  function save(list) { writeRaw(JSON.stringify(list)); }
 
   function get(id) {
     var l = all();
@@ -43,30 +117,100 @@
     return null;
   }
 
+  /* ---------- écriture ---------- */
   function add(place) {
-    var l = all();
-    place.id = place.id || ('p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
-    place.createdAt = Date.now();
-    l.push(place);
-    save(l);
-    return place;
+    var p = clean(place, 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
+    if (!p) return null;
+    while (local.some(function (x) { return x.id === p.id; })) p.id += 'x';
+    p.createdAt = Date.now();
+    local.push(p);
+    writeJSON(LKEY, local);
+    return p;
   }
 
   function update(id, patch) {
-    var l = all(), out = null;
-    for (var i = 0; i < l.length; i++) {
-      if (l[i].id === id) { Object.assign(l[i], patch); out = l[i]; }
-    }
-    save(l);
-    return out;
+    var hit = null;
+    local.forEach(function (p) { if (p.id === id) { Object.assign(p, patch); hit = p; } });
+    if (hit) writeJSON(LKEY, local);
+    return hit;
   }
 
   function remove(id) {
-    save(all().filter(function (p) { return p.id !== id; }));
+    var before = local.length;
+    local = local.filter(function (p) { return p.id !== id; });
+    if (local.length !== before) writeJSON(LKEY, local);
+
+    if (shared.some(function (p) { return p.id === id; }) && deleted.indexOf(id) === -1) {
+      deleted.push(id);
+      writeJSON(DKEY, deleted);
+    }
+  }
+
+  /* ---------- import / export ---------- */
+
+  /* base64 tolérant à l'UTF-8, variante compatible URL */
+  function encode(obj) {
+    var s = global.btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+    return s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function decode(str) {
+    var s = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    return JSON.parse(decodeURIComponent(escape(global.atob(s))));
+  }
+
+  /* n'exporte que le strict nécessaire, pour un lien court */
+  function exportPayload() {
+    return all().map(function (p) {
+      return { i: p.id, n: p.name, a: p.address, y: +p.lat.toFixed(5), x: +p.lon.toFixed(5) };
+    });
+  }
+
+  function importPayload(str) {
+    var arr;
+    try { arr = decode(str); } catch (e) { return { added: 0, skipped: 0, error: true }; }
+    if (!Array.isArray(arr)) return { added: 0, skipped: 0, error: true };
+
+    var known = all(), added = 0, skipped = 0;
+    arr.forEach(function (o) {
+      var p = clean({ id: o.i, name: o.n, address: o.a, lat: o.y, lon: o.x });
+      if (!p) { skipped++; return; }
+      var dup = known.some(function (k) {
+        return k.id === p.id ||
+          (Math.abs(k.lat - p.lat) < 1e-4 && Math.abs(k.lon - p.lon) < 1e-4);
+      });
+      if (dup) { skipped++; return; }
+      /* un identifiant du socle masqué ici redevient visible */
+      var d = deleted.indexOf(p.id);
+      if (d !== -1) { deleted.splice(d, 1); writeJSON(DKEY, deleted); }
+      p.createdAt = Date.now();
+      local.push(p);
+      known.push(p);
+      added++;
+    });
+    if (added) writeJSON(LKEY, local);
+    return { added: added, skipped: skipped, error: false };
+  }
+
+  /* bloc prêt à coller dans places.json */
+  function toSharedJSON() {
+    return JSON.stringify({
+      places: all().map(function (p) {
+        return {
+          id: p.id, name: p.name, address: p.address,
+          lat: +p.lat.toFixed(5), lon: +p.lon.toFixed(5)
+        };
+      })
+    }, null, 2);
   }
 
   global.Store = {
+    ready: ready,
     all: all, get: get, add: add, update: update, remove: remove,
-    persistent: canLS
+    exportPayload: exportPayload, encode: encode, importPayload: importPayload,
+    toSharedJSON: toSharedJSON,
+    persistent: canLS,
+    sharedLoaded: function () { return sharedOk; },
+    sharedCount: function () { return shared.length; }
   };
 })(window);

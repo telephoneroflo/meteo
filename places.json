@@ -1,0 +1,12 @@
+{
+  "_lisezmoi": "Les lieux listés ici apparaissent sur tous les navigateurs et tous les appareils. Modifiez ce fichier depuis GitHub (crayon en haut à droite), validez, attendez une minute : le site se met à jour partout. Le bouton « Copier pour places.json » d'une fiche de prévision produit ce bloc tout prêt. Champs obligatoires : name, lat, lon. L'id doit rester stable dans le temps.",
+  "places": [
+    {
+      "id": "montbrison",
+      "name": "Montbrison",
+      "address": "Montbrison, 42600, Loire",
+      "lat": 45.60833,
+      "lon": 4.06639
+    }
+  ]
+}

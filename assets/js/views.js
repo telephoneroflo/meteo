@@ -63,8 +63,12 @@
     var empty = el('places-empty');
 
     empty.hidden = list.length > 0;
+    el('home-act').hidden = list.length === 0;
     grid.innerHTML = list.map(function (p) {
+      var shared = p.origin === 'shared';
       return '<a class="place" href="#/lieu/' + esc(p.id) + '" data-link data-pid="' + esc(p.id) + '">' +
+        '<span class="place__tag' + (shared ? ' is-shared' : '') + '">' +
+          (shared ? 'partagé' : 'cet appareil') + '</span>' +
         '<p class="place__name">' + esc(p.name) + '</p>' +
         '<p class="place__addr">' + esc(p.address) + '</p>' +
         '<div class="place__foot">' +
@@ -72,6 +76,14 @@
           '<span class="place__ico" data-slot="ico"></span>' +
         '</div></a>';
     }).join('');
+
+    var nShared = 0, nLocal = 0;
+    list.forEach(function (p) { if (p.origin === 'shared') nShared++; else nLocal++; });
+    el('home-hint').textContent = !list.length ? '' :
+      (nShared + ' lieu' + (nShared > 1 ? 'x' : '') + ' dans places.json, visible' +
+       (nShared > 1 ? 's' : '') + ' partout · ' +
+       nLocal + ' ajouté' + (nLocal > 1 ? 's' : '') + ' sur ce navigateur uniquement.' +
+       (nLocal ? ' Pour les retrouver ailleurs : « Copier pour places.json », puis collez dans le fichier du dépôt.' : ''));
 
     list.forEach(function (p) {
       Weather.quick(p.lat, p.lon).then(function (q) {
