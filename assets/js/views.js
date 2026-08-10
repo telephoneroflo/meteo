@@ -63,6 +63,11 @@
     var empty = el('places-empty');
 
     empty.hidden = list.length > 0;
+    if (!list.length && !Store.sharedLoaded()) {
+      document.querySelector('.empty__title').textContent = 'Liste des lieux illisible';
+      document.querySelector('.empty__body').textContent =
+        'Le fichier places.json n’a pas pu être chargé. Si un bloqueur de contenu est actif sur ce site, désactivez-le puis rechargez la page.';
+    }
     grid.innerHTML = list.map(function (p) {
       return '<a class="place" href="#/lieu/' + esc(p.id) + '" data-link data-pid="' + esc(p.id) + '">' +
         '<p class="place__name">' + esc(p.name) + '</p>' +

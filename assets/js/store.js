@@ -21,7 +21,20 @@
 
   var LKEY = 'arome.places.v1';
   var DKEY = 'arome.deleted.v1';
-  var SHARED_URL = 'places.json';
+
+  /* Chemin de places.json calculé depuis l'adresse de ce script, et non
+     depuis l'URL de la page. Une adresse sans barre oblique finale
+     (…github.io/meteo#/ au lieu de …github.io/meteo/#/) ferait autrement
+     chercher le fichier à la racine du domaine, où il n'est pas. */
+  var SHARED_URLS = (function () {
+    var out = [];
+    try {
+      var sc = document.currentScript;
+      if (sc && sc.src) out.push(new URL('../../places.json', sc.src).href);
+    } catch (e) { /* navigateur ancien */ }
+    out.push('places.json');
+    return out;
+  })();
 
   var shared = [];      // socle du dépôt
   var local = [];       // ajouts de cet appareil
@@ -79,16 +92,25 @@
     local = readJSON(LKEY) || [];
     deleted = readJSON(DKEY) || [];
 
-    readyP = fetch(SHARED_URL, { cache: 'no-cache' })
-      .then(function (r) { return r.ok ? r.json() : null; })
+    /* essaie chaque chemin candidat jusqu'à en trouver un qui réponde */
+    function attempt(i) {
+      if (i >= SHARED_URLS.length) return Promise.resolve(null);
+      return fetch(SHARED_URLS[i], { cache: 'no-cache' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) { return j || attempt(i + 1); })
+        .catch(function () { return attempt(i + 1); });
+    }
+
+    readyP = attempt(0)
       .then(function (j) {
-        var list = !j ? [] : (Array.isArray(j) ? j : (j.places || []));
+        if (!j) { shared = []; sharedOk = false; return true; }
+        var list = Array.isArray(j) ? j : (j.places || []);
         shared = list.map(function (p, i) { return clean(p, 'shared-' + i); })
                      .filter(Boolean);
         sharedOk = true;
+        return true;
       })
-      .catch(function () { shared = []; sharedOk = false; })
-      .then(function () { return true; });
+      .catch(function () { shared = []; sharedOk = false; return true; });
 
     return readyP;
   }
