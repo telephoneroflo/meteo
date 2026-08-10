@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AROME — prévisions maille fine</title>
+<meta name="description" content="Prévisions Météo-France AROME 1,5 km pour vos lieux enregistrés.">
+<meta name="theme-color" content="#08121A">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=Martian+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<div class="mesh" aria-hidden="true"></div>
+
+<header class="topbar">
+  <a class="brand" href="#/" data-link>
+    <span class="brand__mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="12" cy="12" r="4.2"/><path d="M12 1.6v3M12 19.4v3M1.6 12h3M19.4 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M19.4 4.6l-2.1 2.1M6.7 17.3l-2.1 2.1"/>
+      </svg>
+    </span>
+    <span class="brand__txt">AROME</span>
+  </a>
+  <p class="topbar__meta" id="topbar-meta">Modèle Météo-France · maille 1,5 km</p>
+  <nav class="topbar__nav">
+    <a class="btn btn--ghost" href="#/nouveau" data-link>Ajouter un lieu</a>
+  </nav>
+</header>
+
+<main id="app" class="app" tabindex="-1">
+  <!-- ============ VUE ACCUEIL ============ -->
+  <section class="view" id="view-home" hidden>
+    <div class="hero-line">
+      <p class="eyebrow">Vos lieux</p>
+      <h1 class="display">Où regarde-t-on<br>le ciel&nbsp;?</h1>
+      <p class="lede">Chaque lieu est interrogé sur la grille AROME&nbsp;1,5&nbsp;km de Météo-France, complétée par ARPEGE au-delà de 48&nbsp;h.</p>
+    </div>
+
+    <div class="places" id="places-grid"></div>
+
+    <div class="empty" id="places-empty" hidden>
+      <p class="empty__title">Aucun lieu enregistré</p>
+      <p class="empty__body">Ajoutez une adresse pour commencer. Elle reste sur cet appareil, rien n’est envoyé ailleurs.</p>
+      <a class="btn btn--solid" href="#/nouveau" data-link>Ajouter un lieu</a>
+    </div>
+  </section>
+
+  <!-- ============ VUE CRÉATION ============ -->
+  <section class="view" id="view-new" hidden>
+    <div class="hero-line hero-line--tight">
+      <p class="eyebrow">Nouveau lieu</p>
+      <h1 class="display display--sm">Placer un point<br>sur la grille</h1>
+    </div>
+
+    <ol class="stepper" id="stepper">
+      <li class="stepper__i is-on" data-step="1"><span>01</span> Adresse</li>
+      <li class="stepper__i" data-step="2"><span>02</span> Vérification</li>
+      <li class="stepper__i" data-step="3"><span>03</span> Confirmation</li>
+    </ol>
+
+    <!-- étape 1 -->
+    <div class="panel" id="step-1">
+      <div class="field">
+        <label class="label" for="in-name">Nom du lieu</label>
+        <input class="input" id="in-name" type="text" placeholder="Maison, Atelier, Chez Fabien…" autocomplete="off">
+        <p class="hint">Laissez vide pour reprendre le nom de la commune.</p>
+      </div>
+      <div class="field">
+        <label class="label" for="in-addr">Adresse</label>
+        <input class="input" id="in-addr" type="text" placeholder="12 rue de la Loire, 42600 Montbrison" autocomplete="off">
+        <p class="hint">Numéro, rue, code postal, commune — ou simplement le nom d’une commune.</p>
+      </div>
+      <div class="row">
+        <button class="btn btn--solid" id="btn-search" type="button">Rechercher l’adresse</button>
+        <button class="btn btn--ghost" id="btn-geoloc" type="button">Utiliser ma position</button>
+      </div>
+      <p class="status" id="status-1" role="status"></p>
+    </div>
+
+    <!-- étape 2 -->
+    <div class="panel panel--split" id="step-2" hidden>
+      <div class="panel__col">
+        <p class="label">Adresses trouvées</p>
+        <ul class="results" id="results"></ul>
+        <p class="hint">Aucune ne convient&nbsp;? Déplacez le repère sur la carte, le point retenu suit le repère.</p>
+        <div class="row">
+          <button class="btn btn--ghost" id="btn-back-1" type="button">Modifier l’adresse</button>
+          <button class="btn btn--solid" id="btn-to-3" type="button">Utiliser ce point</button>
+        </div>
+      </div>
+      <div class="panel__col">
+        <div class="map" id="map"></div>
+      </div>
+    </div>
+
+    <!-- étape 3 -->
+    <div class="panel" id="step-3" hidden>
+      <p class="label">Confirmez l’enregistrement</p>
+      <div class="confirm" id="confirm-card"></div>
+      <div class="row">
+        <button class="btn btn--ghost" id="btn-back-2" type="button">Revenir à la carte</button>
+        <button class="btn btn--solid" id="btn-save" type="button">Enregistrer ce lieu</button>
+      </div>
+      <p class="status" id="status-3" role="status"></p>
+    </div>
+  </section>
+
+  <!-- ============ VUE PRÉVISIONS ============ -->
+  <section class="view" id="view-fc" hidden>
+    <div class="fc-head">
+      <div>
+        <p class="eyebrow" id="fc-eyebrow">—</p>
+        <h1 class="display display--sm" id="fc-name">—</h1>
+      </div>
+      <div class="fc-head__act">
+        <button class="btn btn--ghost" id="btn-refresh" type="button">Actualiser</button>
+        <button class="btn btn--ghost btn--danger" id="btn-del" type="button">Supprimer</button>
+      </div>
+    </div>
+
+    <div class="grid-top">
+      <!-- carte "maintenant" -->
+      <article class="card card--now" id="card-now" aria-live="polite">
+        <div class="now__head">
+          <p class="tag" id="now-model">AROME HD</p>
+          <p class="tag tag--dim" id="now-updated">—</p>
+        </div>
+        <p class="now__clock" id="now-clock">--:--:--</p>
+        <div class="now__temp">
+          <span class="now__deg" id="now-temp">--</span>
+          <span class="now__unit">°C</span>
+          <span class="now__icon" id="now-icon"></span>
+        </div>
+        <p class="now__cond" id="now-cond">—</p>
+        <div class="sun" id="sun-block">
+          <svg class="sun__svg" id="sun-svg" viewBox="0 0 300 78" aria-hidden="true"></svg>
+          <div class="sun__labels">
+            <span><i class="mono">Lever</i> <b id="sun-rise">--:--</b></span>
+            <span><i class="mono">Coucher</i> <b id="sun-set">--:--</b></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 5 jours -->
+      <article class="card card--days">
+        <div class="card__head">
+          <p class="tag">5 jours</p>
+          <p class="tag tag--dim">min → max · risque · cumul</p>
+        </div>
+        <div class="days" id="days"></div>
+      </article>
+    </div>
+
+    <!-- horaire -->
+    <article class="card card--hours">
+      <div class="card__head">
+        <p class="tag">Heure par heure</p>
+        <p class="tag tag--dim" id="hours-range">maintenant → +12 h</p>
+      </div>
+      <div class="hours-scroll" id="hours-scroll">
+        <div class="hours" id="hours"></div>
+      </div>
+    </article>
+
+    <p class="status" id="fc-status" role="status"></p>
+  </section>
+
+  <!-- ============ CHARGEMENT / ERREUR ============ -->
+  <section class="view" id="view-load" hidden>
+    <div class="loader"><span></span><span></span><span></span></div>
+    <p class="loader__txt" id="load-txt">Interrogation de la grille AROME…</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Données <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> · modèles AROME &amp; ARPEGE <a href="https://meteofrance.com/" target="_blank" rel="noopener">Météo-France</a> · adresses <a href="https://adresse.data.gouv.fr/" target="_blank" rel="noopener">Base Adresse Nationale</a></p>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/weather.js"></script>
+<script src="assets/js/geo.js"></script>
+<script src="assets/js/views.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
